@@ -3,217 +3,108 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Escáner QR</title>
 
-<style>
-body{
-    font-family: Arial, sans-serif;
-    margin:0;
-    padding:20px;
-    background:#f5f5f5;
-    text-align:center;
-}
+<title>Sistema de Estudiantes y Asistencias</title>
 
-h1{
-    color:#333;
-}
+<link rel="stylesheet" href="styles.css">
 
-#reader{
-    width:100%;
-    max-width:500px;
-    margin:20px auto;
-    border:2px solid #ddd;
-    border-radius:10px;
-    overflow:hidden;
-}
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-button{
-    padding:12px 20px;
-    border:none;
-    border-radius:8px;
-    cursor:pointer;
-    font-size:16px;
-    margin:5px;
-}
-
-.btn-start{
-    background:#28a745;
-    color:white;
-}
-
-.btn-clear{
-    background:#dc3545;
-    color:white;
-}
-
-table{
-    width:100%;
-    max-width:800px;
-    margin:20px auto;
-    border-collapse:collapse;
-    background:white;
-}
-
-th, td{
-    border:1px solid #ddd;
-    padding:10px;
-    text-align:left;
-}
-
-th{
-    background:#007bff;
-    color:white;
-}
-
-#status{
-    margin:10px;
-    font-weight:bold;
-}
-</style>
-</head>
-<body>
-
-<h1>Escáner de Códigos QR</h1>
-
-<button class="btn-start" onclick="iniciarScanner()">
-Abrir Cámara
-</button>
-
-<button class="btn-clear" onclick="limpiarRegistros()">
-Limpiar Registros
-</button>
-
-<div id="status">Esperando...</div>
-
-<div id="reader"></div>
-
-<h2>Códigos Capturados</h2>
-
-<table>
-    <thead>
-        <tr>
-            <th>#</th>
-            <th>Contenido QR</th>
-            <th>Fecha/Hora</th>
-        </tr>
-    </thead>
-    <tbody id="tablaQR"></tbody>
-</table>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 
-<script>
+</head>
+<body>
 
-let scannerActivo = false;
-let html5QrCode;
+<header>
+<h1>
+<i class="fa-solid fa-graduation-cap"></i>
+Sistema de Gestión Académica
+</h1>
+</header>
 
-const STORAGE_KEY = "codigos_qr";
+<div class="contenedor">
 
-cargarRegistros();
+<div class="acciones">
 
-function iniciarScanner(){
+<button onclick="nuevoEstudiante()">
+<i class="fa fa-user-plus"></i>
+Nuevo Estudiante
+</button>
 
-    if(scannerActivo) return;
+<button onclick="abrirScanner()">
+<i class="fa fa-qrcode"></i>
+Registrar Asistencia QR
+</button>
 
-    html5QrCode = new Html5Qrcode("reader");
+<button onclick="exportarDatos()">
+<i class="fa fa-download"></i>
+Exportar Backup
+</button>
 
-    Html5Qrcode.getCameras()
-    .then(cameras => {
+<button onclick="document.getElementById('importFile').click()">
+<i class="fa fa-upload"></i>
+Importar Backup
+</button>
 
-        if(!cameras || cameras.length === 0){
-            alert("No se encontró cámara.");
-            return;
-        }
+<input type="file"
+id="importFile"
+accept=".json"
+style="display:none"
+onchange="importarDatos(event)">
+</div>
 
-        let camaraTrasera = cameras[cameras.length - 1].id;
+<section>
 
-        html5QrCode.start(
-            camaraTrasera,
-            {
-                fps: 10,
-                qrbox: 250
-            },
-            onScanSuccess
-        );
+<h2>Lista de Estudiantes</h2>
 
-        scannerActivo = true;
-        document.getElementById("status").innerText =
-            "Escaneando...";
+<table>
+<thead>
+<tr>
+<th>DNI</th>
+<th>Nombres</th>
+<th>Apellidos</th>
+<th>Género</th>
+<th>Teléfono</th>
+<th>Edad</th>
+<th>Acciones</th>
+</tr>
+</thead>
 
-    })
-    .catch(err=>{
-        console.error(err);
-        alert("Error al acceder a la cámara.");
-    });
-}
+<tbody id="tablaEstudiantes"></tbody>
 
-function onScanSuccess(decodedText){
+</table>
 
-    let registros =
-        JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+</section>
 
-    const existe = registros.some(
-        r => r.codigo === decodedText
-    );
+<section>
 
-    if(existe){
-        return;
-    }
+<h2>Registro de Asistencias</h2>
 
-    const nuevoRegistro = {
-        codigo: decodedText,
-        fecha: new Date().toLocaleString()
-    };
+<table>
+<thead>
+<tr>
+<th>DNI</th>
+<th>Nombre</th>
+<th>Fecha</th>
+<th>Hora</th>
+<th>Acciones</th>
+</tr>
+</thead>
 
-    registros.push(nuevoRegistro);
+<tbody id="tablaAsistencias"></tbody>
 
-    localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(registros)
-    );
+</table>
 
-    cargarRegistros();
+</section>
 
-    document.getElementById("status").innerText =
-        "QR detectado: " + decodedText;
+<div id="reader"></div>
 
-    navigator.vibrate?.(200);
-}
+</div>
 
-function cargarRegistros(){
-
-    let registros =
-        JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-
-    let html = "";
-
-    registros.forEach((item,index)=>{
-
-        html += `
-        <tr>
-            <td>${index + 1}</td>
-            <td>${item.codigo}</td>
-            <td>${item.fecha}</td>
-        </tr>
-        `;
-    });
-
-    document.getElementById("tablaQR").innerHTML = html;
-}
-
-function limpiarRegistros(){
-
-    if(!confirm("¿Eliminar todos los registros?")){
-        return;
-    }
-
-    localStorage.removeItem(STORAGE_KEY);
-    cargarRegistros();
-
-    document.getElementById("status").innerText =
-        "Registros eliminados";
-}
-</script>
+<script src="app.js"></script>
 
 </body>
 </html>
